@@ -1,90 +1,47 @@
-# GitHub 静态部署指南
+# 部署指南
 
-## 方法一：GitHub Pages（推荐）
+## GitHub Pages 部署步骤
 
-### 步骤1：准备代码
-1. 确保项目可以正常构建：
+1. **构建项目**
 ```bash
 npm run build
 ```
 
-### 步骤2：创建GitHub仓库
-1. 在GitHub创建新仓库（如：`fund-valuation-system`）
-2. 初始化并推送代码：
+2. **将dist目录推送到GitHub仓库**
 ```bash
-git init
-git add .
-git commit -m "初始提交"
-git branch -M main
-git remote add origin https://github.com/你的用户名/fund-valuation-system.git
-git push -u origin main
+git add dist
+git commit -m "Build for production"
+git push origin main
 ```
 
-### 步骤3：配置GitHub Pages
-1. 进入仓库设置（Settings）
-2. 左侧菜单选择 Pages
-3. Source 选择 "GitHub Actions"
-4. 保存设置
+3. **在GitHub仓库设置中配置Pages**
+   - 进入仓库的Settings > Pages
+   - Source选择"GitHub Actions"或"Deploy from a branch"
+   - Branch选择`main`（或包含dist目录的分支）
+   - Base路径设置为`/fund-valuation-system/`
 
-### 步骤4：修改配置（重要）
-在 `vite.config.js` 中修改 base 路径为你的仓库名：
+## 注意事项
+
+- 确保`vite.config.js`中的base配置正确：
 ```javascript
-base: process.env.NODE_ENV === 'production' ? '/fund-valuation-system/' : '/'
+base: '/fund-valuation-system/'
 ```
 
-### 步骤5：部署
-1. 代码推送到main分支后，GitHub Actions会自动部署
-2. 访问地址：`https://你的用户名.github.io/fund-valuation-system`
+- GitHub Pages只会服务根目录和子目录，不会服务src目录
 
-## 方法二：Vercel部署（更简单）
+- 部署后访问：`https://yourusername.github.io/fund-valuation-system/`
 
-### 步骤：
-1. 访问 [vercel.com](https://vercel.com)
-2. 使用GitHub账号登录
-3. 导入你的GitHub仓库
-4. 自动部署完成
-5. 访问Vercel提供的域名
+## 常见问题
 
-## 方法三：Netlify部署
+### 404错误
+如果出现404错误，请检查：
+1. 是否正确构建了项目
+2. 是否将dist目录推送到GitHub
+3. GitHub Pages设置是否正确配置了base路径
+4. 确保没有直接部署src目录
 
-### 步骤：
-1. 访问 [netlify.com](https://netlify.com)
-2. 连接GitHub账户
-3. 选择仓库，构建命令填 `npm run build`
-4. 发布目录填 `dist`
-5. 部署完成
-
-## 部署注意事项
-
-### 1. 路径问题
-- 确保所有资源路径使用相对路径
-- 检查路由配置是否正确
-
-### 2. 环境变量
-- 生产环境可能需要不同的API配置
-- 使用环境变量管理不同环境的配置
-
-### 3. 缓存问题
-- 部署后可能需要清除浏览器缓存
-- 考虑使用版本号或哈希值避免缓存
-
-### 4. 域名配置（可选）
-- 可以绑定自定义域名
-- 需要配置DNS解析
-
-## 快速验证部署
-
-部署完成后，访问你的网站并测试：
-1. ✅ 页面正常加载
-2. ✅ 基金数据可以正常获取
-3. ✅ 响应式布局正常工作
-4. ✅ 所有功能正常使用
-
-## 故障排除
-
-### 常见问题：
-1. **404错误**：检查base路径配置
-2. **资源加载失败**：确认路径是否正确
-3. **API调用失败**：检查跨域问题和HTTPS
-
-如果遇到问题，检查GitHub Actions的构建日志获取详细错误信息。
+### 资源路径问题
+确保index.html中的脚本和样式表路径正确：
+```html
+<script type="module" src="/fund-valuation-system/assets/main.js"></script>
+```
