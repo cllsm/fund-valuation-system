@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import App from '../App.vue'
 import MobileApp from '../MobileApp.vue'
 
@@ -32,7 +32,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(process.env.NODE_ENV === 'production' ? '/fund-valuation-system/' : '/'),
+  history: createWebHashHistory(),
   routes
 })
 
