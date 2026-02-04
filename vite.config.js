@@ -18,5 +18,5 @@ export default defineConfig({
       }
     }
   },
-  base: '/fund-valuation-system/'
+  base: process.env.NODE_ENV === 'production' ? '/fund-valuation-system/' : '/'
 })
