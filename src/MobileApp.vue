@@ -28,23 +28,25 @@
 
     <!-- 基金列表 -->
     <div class="fund-list-container" :class="{ 'loading': isRefreshing }">
-      <!-- 分组选择器（如果有分组） -->
-      <div class="group-selector" v-if="groups.length > 0">
-        <select v-model="currentGroup" @change="switchGroup" class="group-select">
-          <option value="">所有基金</option>
-          <option v-for="group in groups" :key="group.id" :value="group.id">
-            {{ group.name }} ({{ group.fundCount }})
-          </option>
-        </select>
-      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <!-- 分组选择器（如果有分组） -->
+        <div class="group-selector" v-if="groups.length > 0">
+          <select v-model="currentGroup" @change="switchGroup" class="group-select">
+            <option value="">所有基金</option>
+            <option v-for="group in groups" :key="group.id" :value="group.id">
+              {{ group.name }} ({{ group.fundCount }})
+            </option>
+          </select>
+        </div>
 
-      <!-- 排序选择器 -->
-      <div class="sort-selector">
-        <select v-model="currentSort" @change="applySort" class="sort-select">
-          <option value="default">默认排序</option>
-          <option value="changeRateDesc">涨跌幅 ↓</option>
-          <option value="changeRateAsc">涨跌幅 ↑</option>
-        </select>
+        <!-- 排序选择器 -->
+        <div class="sort-selector">
+          <select v-model="currentSort" @change="applySort" class="sort-select">
+            <option value="default">默认排序</option>
+            <option value="changeRateDesc">涨跌幅 ↓</option>
+            <option value="changeRateAsc">涨跌幅 ↑</option>
+          </select>
+        </div>
       </div>
 
         <!-- 基金卡片列表 -->
@@ -704,11 +706,13 @@ export default {
 }
 
 .group-selector {
-  margin: 16px 0;
+  margin: 10px 10px 10px 0;
+  width: 100%;
 }
 
 .sort-selector {
-  margin: 0 0 16px 0;
+  margin: 10px 0 10px 10px;
+  width: 100%;
 }
 
 .group-select, .sort-select {
