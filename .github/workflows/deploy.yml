@@ -39,6 +39,13 @@ jobs:
       with:
         path: ./dist
         
+    - name: Verify build output
+      run: |
+        echo "Build files:"
+        ls -la dist/
+        echo "Index.html content:"
+        cat dist/index.html
+        
   deploy:
     environment:
       name: github-pages
