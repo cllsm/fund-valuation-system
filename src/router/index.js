@@ -4,6 +4,10 @@ import MobileApp from '../MobileApp.vue'
 
 // 基于屏幕尺寸检测是否为移动设备
 function isMobileScreen() {
+  // 在服务器端渲染或预渲染时，默认返回 false
+  if (typeof window === 'undefined') {
+    return false
+  }
   const screenWidth = window.innerWidth
   // 768px 是常见的移动端和桌面端分界点
   return screenWidth <= 768
@@ -12,7 +16,7 @@ function isMobileScreen() {
 const routes = [
   {
     path: '/',
-    component: isMobileScreen() ? MobileApp : App,
+    component: App,
     name: 'Home'
   },
   {
@@ -28,7 +32,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(process.env.NODE_ENV === 'production' ? '/fund-valuation-system/' : '/'),
   routes
 })
 
