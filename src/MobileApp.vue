@@ -100,7 +100,7 @@
         <span class="nav-icon">+</span>
         <span class="nav-text">添加</span>
       </button>
-      <button class="nav-btn" @click="showAddGroupDialog = true" v-if="groups.length > 0">
+      <button class="nav-btn" @click="showAddGroupDialog = true">
         <span class="nav-icon">📁</span>
         <span class="nav-text">分组</span>
       </button>
