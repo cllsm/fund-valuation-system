@@ -63,8 +63,8 @@ export async function fetchFundStockPositions(fundCode) {
   return new Promise((resolve, reject) => {
     const timestamp = Date.now();
     
-    // 使用本地代理绕过CORS限制
-    const proxyUrl = `/api/fund/pingzhongdata/${fundCode}.js?rt=${timestamp}`;
+    // 使用绝对URL地址，避免GitHub Pages部署后的路径问题
+    const proxyUrl = `https://fundgz.1234567.com.cn/js/${fundCode}.js?rt=${timestamp}`;
     
     fetch(proxyUrl)
       .then(response => {
@@ -214,8 +214,8 @@ function parseFundStockData(data) {
  */
 export async function fetchStockRealTimeData(stockCode) {
   return new Promise((resolve, reject) => {
-    // 优先使用本地开发服务器代理
-    const localProxyUrl = `/api/stock/q=${stockCode}`;
+    // 使用腾讯财经API直接请求股票数据
+    const localProxyUrl = `https://qt.gtimg.cn/q=${stockCode}`;
     
     fetch(localProxyUrl)
       .then(response => {
@@ -239,8 +239,8 @@ export async function fetchStockRealTimeData(stockCode) {
       .catch(error => {
         console.warn('本地代理请求失败，尝试新浪财经API:', error.message);
         
-        // 备用方案：使用新浪财经API（支持CORS）
-        const sinaUrl = `/api/sina/list=${stockCode}`;
+        // 备用方案：使用新浪财经API
+        const sinaUrl = `https://hq.sinajs.cn/list=${stockCode}`;
         
         fetch(sinaUrl)
           .then(response => {
