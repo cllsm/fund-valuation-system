@@ -33,6 +33,6 @@ jobs:
         
       - name: Deploy to Railway
         run: |
-          railway login --token $RAILWAY_TOKEN
+          railway login $RAILWAY_TOKEN
           railway switch $RAILWAY_PROJECT_ID
           railway deploy
