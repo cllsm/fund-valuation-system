@@ -266,11 +266,11 @@
       </div>
     </div>
 
-    <!-- 持仓个股弹窗 -->
+    <!-- 资产配置弹窗 -->
     <div v-if="showStockPositionsDialog" class="modal-overlay" @click="showStockPositionsDialog = false">
       <div class="modal stock-modal" @click.stop>
         <div class="modal-header">
-          <h3>持仓个股 ({{ selectedFund?.name }} - {{ selectedFund?.code }})</h3>
+          <h3>资产配置 ({{ selectedFund?.name }} - {{ selectedFund?.code }})</h3>
           <button class="close-btn" @click="showStockPositionsDialog = false">×</button>
         </div>
         <div class="modal-body stock-body">
@@ -278,39 +278,82 @@
           <div v-if="isLoadingStocks" class="loading-stocks">
             <div class="loading-spinner">
               <div class="spinner"></div>
-              <div>正在加载持仓数据...</div>
+              <div>正在加载资产配置数据...</div>
             </div>
           </div>
           
           <!-- 错误状态 -->
           <div v-else-if="stockError" class="error-message">
             {{ stockError }}
-            <button class="btn btn-primary retry-btn" @click="loadFundStockPositions">
+            <button class="btn btn-primary retry-btn" @click="loadFundAssetAllocation">
               重试
             </button>
           </div>
           
-          <!-- 持仓股票列表 -->
-          <div v-else-if="stockPositions.length > 0" class="stock-list">
-            <div class="stock-item" v-for="stock in stockPositions" :key="stock.code" @click="showStockDetail(stock)">
-              <div class="stock-header">
-                <div class="stock-name">{{ stock.name }}</div>
-                <div class="stock-code">{{ stock.code }}</div>
+          <!-- 资产配置信息 -->
+          <div v-else-if="selectedFund?.assetData" class="asset-allocation">
+            <!-- 资产配置概览 -->
+            <div class="asset-overview">
+              <div class="asset-overview-item">
+                <span class="asset-label">数据来源</span>
+                <span class="asset-value">{{ selectedFund.assetData.source_mark || selectedFund.assetData.source }}</span>
               </div>
-              <div class="stock-data">
-                <div class="stock-price">{{ stock.currentPrice || '--' }}</div>
-                <div class="stock-change" :class="{ 'positive': stock.changeRate > 0, 'negative': stock.changeRate < 0 }">
-                  {{ formatStockChangeRate(stock.changeRate) }}
+              <div class="asset-chart">
+                <div v-for="item in selectedFund.assetData.chart_list" :key="item.type" class="chart-item">
+                  <div class="chart-color" :style="{ backgroundColor: item.color }"></div>
+                  <span class="chart-label">{{ item.type_desc }}</span>
+                  <span class="chart-percent">{{ item.percent }}%</span>
                 </div>
               </div>
-              <div class="stock-time">{{ stock.timestamp ? formatTimestamp(stock.timestamp) : '--' }}</div>
+            </div>
+            
+            <!-- 行业配置 -->
+            <div v-if="selectedFund.assetData.industry_list && selectedFund.assetData.industry_list.length > 0" class="asset-section">
+              <h4 class="section-title">行业配置</h4>
+              <div class="industry-list">
+                <div v-for="industry in selectedFund.assetData.industry_list" :key="industry.industry_code" class="industry-item">
+                  <span class="industry-name">{{ industry.industry_name }}</span>
+                  <span class="industry-percent">{{ industry.percent }}%</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 股票持仓 -->
+            <div v-if="stockPositions.length > 0" class="asset-section">
+              <h4 class="section-title">股票持仓 (前{{ stockPositions.length }}名)</h4>
+              <div class="stock-list">
+                <div class="stock-item" v-for="stock in stockPositions" :key="stock.code" @click="openStockXueqiu(stock)">
+                  <div class="stock-header">
+                    <div class="stock-name">{{ stock.name }}</div>
+                    <div class="stock-code">{{ stock.code }}</div>
+                  </div>
+                  <div class="stock-data">
+                    <div class="stock-percent">{{ stock.percent }}%</div>
+                    <div class="stock-price">{{ stock.current_price || '--' }}</div>
+                    <div class="stock-change" :class="{ 'positive': stock.change_percentage > 0, 'negative': stock.change_percentage < 0 }">
+                      {{ stock.change_percentage > 0 ? '+' : '' }}{{ stock.change_percentage || '--' }}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 债券持仓 -->
+            <div v-if="selectedFund.assetData.bond_list && selectedFund.assetData.bond_list.length > 0" class="asset-section">
+              <h4 class="section-title">债券持仓</h4>
+              <div class="bond-list">
+                <div v-for="bond in selectedFund.assetData.bond_list" :key="bond.code" class="bond-item">
+                  <span class="bond-name">{{ bond.name }}</span>
+                  <span class="bond-percent">{{ bond.percent }}%</span>
+                </div>
+              </div>
             </div>
           </div>
           
           <!-- 空状态 -->
           <div v-else class="empty-stocks">
-            <div class="empty-icon">📈</div>
-            <div class="empty-text">暂无持仓个股数据</div>
+            <div class="empty-icon">📊</div>
+            <div class="empty-text">暂无资产配置数据</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -388,8 +431,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { getFundStockDetails } from './utils/stockService'
-import { mockGetFundStockDetails } from './utils/stockService.test'
+import { getFundAssetAllocation } from './services/danjuanApi'
 
 export default {
   name: 'App',
@@ -667,32 +709,25 @@ export default {
     const showFundStockPositions = async (fund) => {
       selectedFund.value = fund
       showStockPositionsDialog.value = true
-      await loadFundStockPositions()
+      await loadFundAssetAllocation()
     }
 
-    const loadFundStockPositions = async () => {
+    const loadFundAssetAllocation = async () => {
       if (!selectedFund.value) return
       
       isLoadingStocks.value = true
       stockError.value = ''
       
       try {
-        // 首先尝试使用真实API
-        const stockDetails = await getFundStockDetails(selectedFund.value.code)
-        stockPositions.value = stockDetails
-      } catch (error) {
-        console.error('获取基金持仓数据失败，尝试使用模拟数据:', error)
+        const assetData = await getFundAssetAllocation(selectedFund.value.code)
+        stockPositions.value = assetData.stock_list || []
         
-        // 如果真实API失败，使用模拟数据
-        try {
-          const mockStockDetails = await mockGetFundStockDetails(selectedFund.value.code)
-          stockPositions.value = mockStockDetails
-          stockError.value = '使用模拟数据展示（实际数据获取失败）'
-        } catch (mockError) {
-          console.error('模拟数据也获取失败:', mockError)
-          stockError.value = '获取持仓数据失败，请检查网络连接或稍后重试'
-          stockPositions.value = []
-        }
+        // 保存完整的资产配置数据用于显示
+        selectedFund.value.assetData = assetData
+      } catch (error) {
+        console.error('获取基金资产配置数据失败:', error)
+        stockError.value = '获取资产配置数据失败，请检查网络连接或稍后重试'
+        stockPositions.value = []
       } finally {
         isLoadingStocks.value = false
       }
@@ -701,6 +736,17 @@ export default {
     const showStockDetail = (stock) => {
       selectedStock.value = stock
       showStockDetailDialog.value = true
+    }
+
+    const openStockXueqiu = (stock) => {
+      if (stock.xq_url) {
+        // 在新标签页打开雪球股票页面
+        window.open(stock.xq_url, '_blank')
+      } else {
+        // 如果没有xq_url，使用默认的雪球链接格式
+        const defaultUrl = `https://xueqiu.com/S/${stock.code}`
+        window.open(defaultUrl, '_blank')
+      }
     }
 
     const formatStockChangeRate = (rate) => {
@@ -1069,6 +1115,7 @@ export default {
       deleteFund,
       showFundStockPositions,
       showStockDetail,
+      openStockXueqiu,
       formatStockChangeRate,
       formatTimestamp,
       getGroupName
@@ -1830,6 +1877,192 @@ input:checked + .slider:before {
   padding: 20px;
   flex: 1;
   overflow-y: auto;
+}
+
+/* 资产配置弹窗样式 */
+.asset-allocation {
+  padding: 20px;
+}
+
+.asset-overview {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.asset-overview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.asset-label {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.asset-value {
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.asset-chart {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.chart-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.chart-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.chart-label {
+  font-size: 14px;
+  color: #333;
+}
+
+.chart-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.asset-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.industry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.industry-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.industry-name {
+  font-size: 14px;
+  color: #333;
+}
+
+.industry-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.bond-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bond-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.bond-name {
+  font-size: 14px;
+  color: #333;
+}
+
+.bond-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: #287DFF;
+}
+
+.stock-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.stock-item:last-child {
+  border-bottom: none;
+}
+
+.stock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.stock-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.stock-code {
+  font-size: 12px;
+  color: #666;
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.stock-data {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stock-percent {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1890ff;
+}
+
+.stock-price {
+  font-size: 14px;
+  color: #666;
+}
+
+.stock-change.positive {
+  color: #f5222d;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stock-change.negative {
+  color: #52c41a;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .stock-detail-section .detail-item {

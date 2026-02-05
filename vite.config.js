@@ -25,6 +25,12 @@ export default defineConfig({
         target: 'https://hq.sinajs.cn',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/sina/, '')
+      },
+      // 代理蛋卷基金API
+      '/api/danjuan': {
+        target: 'https://danjuanfunds.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/danjuan/, '/djapi/fundx')
       }
     }
   },
