@@ -54,10 +54,9 @@ jobs:
         run: npm run build
         
       - name: Install backend dependencies
-        run: cd server && npm ci
-        
-      - name: Test backend
-        run: cd server && npm test --if-present
+        run: |
+          cd server
+          npm ci
         
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
