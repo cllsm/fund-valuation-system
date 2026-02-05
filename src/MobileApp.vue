@@ -196,10 +196,131 @@
             <button class="btn btn-primary" @click="refreshSingleFund(selectedFund)">
               刷新数据
             </button>
+            <button class="btn btn-info" @click="showFundStockPositions(selectedFund)" :disabled="isLoadingStocks">
+              {{ isLoadingStocks ? '加载中...' : '查看持仓' }}
+            </button>
             <button class="btn btn-danger" @click="deleteFund(selectedFund.code); showFundDetailDialog = false">
               删除基金
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 持仓个股弹窗 -->
+    <div v-if="showStockPositionsDialog" class="modal-overlay" @click="showStockPositionsDialog = false">
+      <div class="modal stock-modal" @click.stop>
+        <div class="modal-header">
+          <h3>持仓个股 ({{ selectedFund?.name }} - {{ selectedFund?.code }})</h3>
+          <button class="close-btn" @click="showStockPositionsDialog = false">×</button>
+        </div>
+        <div class="modal-body stock-body">
+          <!-- 加载状态 -->
+          <div v-if="isLoadingStocks" class="loading-stocks">
+            <div class="loading-spinner">
+              <div class="spinner"></div>
+              <div>正在加载持仓数据...</div>
+            </div>
+          </div>
+          
+          <!-- 错误状态 -->
+          <div v-else-if="stockError" class="error-message">
+            {{ stockError }}
+            <button class="btn btn-primary retry-btn" @click="loadFundStockPositions">
+              重试
+            </button>
+          </div>
+          
+          <!-- 持仓股票列表 -->
+          <div v-else-if="stockPositions.length > 0" class="stock-list">
+            <div class="stock-item" v-for="stock in stockPositions" :key="stock.code" @click="showStockDetail(stock)">
+              <div class="stock-header">
+                <div class="stock-name">{{ stock.name }}</div>
+                <div class="stock-code">{{ stock.code }}</div>
+              </div>
+              <div class="stock-data">
+                <div class="stock-price">{{ stock.currentPrice || '--' }}</div>
+                <div class="stock-change" :class="{ 'positive': stock.changeRate > 0, 'negative': stock.changeRate < 0 }">
+                  {{ formatStockChangeRate(stock.changeRate) }}
+                </div>
+              </div>
+              <div class="stock-time">{{ stock.timestamp ? formatTimestamp(stock.timestamp) : '--' }}</div>
+            </div>
+          </div>
+          
+          <!-- 空状态 -->
+          <div v-else class="empty-stocks">
+            <div class="empty-icon">📈</div>
+            <div class="empty-text">暂无持仓个股数据</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showStockPositionsDialog = false">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 个股详情弹窗 -->
+    <div v-if="showStockDetailDialog" class="modal-overlay" @click="showStockDetailDialog = false">
+      <div class="modal stock-detail-modal" @click.stop>
+        <div class="modal-header">
+          <h3>个股详情</h3>
+          <button class="close-btn" @click="showStockDetailDialog = false">×</button>
+        </div>
+        <div class="modal-body stock-detail-body" v-if="selectedStock">
+          <div class="stock-detail-section">
+            <div class="detail-item">
+              <span class="detail-label">股票名称</span>
+              <span class="detail-value">{{ selectedStock.name }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">股票代码</span>
+              <span class="detail-value">{{ selectedStock.code }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">当前价格</span>
+              <span class="detail-value value-large">{{ selectedStock.currentPrice || '--' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">涨跌幅</span>
+              <span class="detail-value" :class="{ 'positive': selectedStock.changeRate > 0, 'negative': selectedStock.changeRate < 0 }">
+                {{ formatChangeRate(selectedStock.changeRate) }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">涨跌额</span>
+              <span class="detail-value" :class="{ 'positive': selectedStock.change > 0, 'negative': selectedStock.change < 0 }">
+                {{ selectedStock.change > 0 ? '+' : '' }}{{ selectedStock.change || '--' }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">今开</span>
+              <span class="detail-value">{{ selectedStock.todayOpen || '--' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">最高</span>
+              <span class="detail-value">{{ selectedStock.high || '--' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">最低</span>
+              <span class="detail-value">{{ selectedStock.low || '--' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">成交量</span>
+              <span class="detail-value">{{ selectedStock.volume ? (selectedStock.volume / 10000).toFixed(2) + '万手' : '--' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">更新时间</span>
+              <span class="detail-value">{{ selectedStock.timestamp ? formatTimestamp(selectedStock.timestamp) : '--' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showStockDetailDialog = false">
+            关闭
+          </button>
         </div>
       </div>
     </div>
@@ -216,6 +337,8 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { getFundStockDetails } from './utils/stockService'
+import { mockGetFundStockDetails } from './utils/stockService.test'
 
 export default {
   name: 'MobileApp',
@@ -226,13 +349,19 @@ export default {
     const showAddFundDialog = ref(false)
     const showAddGroupDialog = ref(false)
     const showFundDetailDialog = ref(false)
+    const showStockPositionsDialog = ref(false)
+    const showStockDetailDialog = ref(false)
     const selectedFund = ref(null)
+    const selectedStock = ref(null)
+    const stockPositions = ref([])
     const newFundCode = ref('')
     const newGroupName = ref('')
     const addFundError = ref('')
     const addGroupError = ref('')
+    const stockError = ref('')
     const loading = ref(false)
     const isRefreshing = ref(false)
+    const isLoadingStocks = ref(false)
     const autoRefresh = ref(true)
     const connectionStatus = ref('ok')
     const currentGroup = ref('')
@@ -292,10 +421,14 @@ export default {
       try {
         const fundData = await fetchFundData(fund.code)
         if (fundData) {
+          // 更新本地数据
           fund.name = fundData.name
           fund.currentValue = fundData.gsz
           fund.changeRate = parseFloat(fundData.gszzl)
           fund.updateTime = fundData.gztime
+          
+          // 同时更新App.vue中的数据（如果存在）
+          syncFundDataToApp(fund)
           saveToStorage()
         }
       } catch (error) {
@@ -373,17 +506,27 @@ export default {
               try {
                 const data = await fetchFundData(fund.code)
                 if (data) {
-                  setTimeout(() => {
-                    fund.name = data.name
-                    fund.currentValue = data.gsz
-                    fund.changeRate = parseFloat(data.gszzl)
-                    fund.updateTime = data.gztime
-                    fund.isUpdating = false
-                  }, index * 100)
+                  // 使用基金代码精确匹配，避免索引顺序问题
+                  const targetFund = funds.value.find(f => f.code === fund.code)
+                  if (targetFund) {
+                    setTimeout(() => {
+                      targetFund.name = data.name
+                      targetFund.currentValue = data.gsz
+                      targetFund.changeRate = parseFloat(data.gszzl)
+                      targetFund.updateTime = data.gztime
+                      targetFund.isUpdating = false
+                      
+                      // 同步数据到App.vue
+                      syncFundDataToApp(targetFund)
+                    }, index * 100)
+                  }
                 }
               } catch (error) {
                 console.error(`刷新基金 ${fund.code} 数据失败:`, error)
-                fund.isUpdating = false
+                const targetFund = funds.value.find(f => f.code === fund.code)
+                if (targetFund) {
+                  targetFund.isUpdating = false
+                }
               }
             })
           )
@@ -396,6 +539,7 @@ export default {
         }
 
         await Promise.allSettled(promises)
+        saveToStorage() // 批量刷新完成后统一保存
       } catch (error) {
         connectionStatus.value = 'error'
         console.error('刷新数据失败:', error)
@@ -479,6 +623,84 @@ export default {
 
     const applySort = () => {
       // 排序已通过计算属性自动应用
+    }
+
+    // 持仓个股相关方法
+    const showFundStockPositions = async (fund) => {
+      selectedFund.value = fund
+      showStockPositionsDialog.value = true
+      await loadFundStockPositions()
+    }
+
+    const loadFundStockPositions = async () => {
+      if (!selectedFund.value) return
+      
+      isLoadingStocks.value = true
+      stockError.value = ''
+      
+      try {
+        // 首先尝试使用真实API
+        const stockDetails = await getFundStockDetails(selectedFund.value.code)
+        stockPositions.value = stockDetails
+      } catch (error) {
+        console.error('获取基金持仓数据失败，尝试使用模拟数据:', error)
+        
+        // 如果真实API失败，使用模拟数据
+        try {
+          const mockStockDetails = await mockGetFundStockDetails(selectedFund.value.code)
+          stockPositions.value = mockStockDetails
+          stockError.value = '使用模拟数据展示（实际数据获取失败）'
+        } catch (mockError) {
+          console.error('模拟数据也获取失败:', mockError)
+          stockError.value = '获取持仓数据失败，请检查网络连接或稍后重试'
+          stockPositions.value = []
+        }
+      } finally {
+        isLoadingStocks.value = false
+      }
+    }
+
+    const showStockDetail = (stock) => {
+      selectedStock.value = stock
+      showStockDetailDialog.value = true
+    }
+
+    const formatStockChangeRate = (rate) => {
+      if (rate === undefined || rate === null) return '--'
+      return rate > 0 ? `+${rate}%` : `${rate}%`
+    }
+
+    const formatTimestamp = (timestamp) => {
+      // 格式化时间戳：20260205120517 -> 2026-02-05 12:05:17
+      if (!timestamp || timestamp.length !== 14) return timestamp
+      
+      const year = timestamp.substring(0, 4)
+      const month = timestamp.substring(4, 6)
+      const day = timestamp.substring(6, 8)
+      const hour = timestamp.substring(8, 10)
+      const minute = timestamp.substring(10, 12)
+      const second = timestamp.substring(12, 14)
+      
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+    }
+
+    // 同步基金数据到App.vue
+    const syncFundDataToApp = (fund) => {
+      // 先确保数据保存到localStorage
+      saveToStorage()
+      
+      // 触发自定义事件通知App.vue更新数据
+      const event = new CustomEvent('fundDataUpdated', {
+        detail: {
+          code: fund.code,
+          name: fund.name,
+          currentValue: fund.currentValue,
+          changeRate: fund.changeRate,
+          updateTime: fund.updateTime,
+          timestamp: Date.now() // 添加时间戳确保顺序
+        }
+      })
+      window.dispatchEvent(event)
     }
 
     const updateGroupStats = () => {
@@ -586,13 +808,19 @@ export default {
       showAddFundDialog,
       showAddGroupDialog,
       showFundDetailDialog,
+      showStockPositionsDialog,
+      showStockDetailDialog,
       selectedFund,
+      selectedStock,
+      stockPositions,
       newFundCode,
       newGroupName,
       addFundError,
       addGroupError,
+      stockError,
       loading,
       isRefreshing,
+      isLoadingStocks,
       autoRefresh,
       connectionStatus,
       currentGroup,
@@ -608,7 +836,11 @@ export default {
       applySort,
       toggleAutoRefresh,
       showFundDetail,
-      refreshSingleFund
+      refreshSingleFund,
+      showFundStockPositions,
+      showStockDetail,
+      formatStockChangeRate,
+      formatTimestamp
     }
   }
 }
@@ -1151,6 +1383,188 @@ export default {
   border-radius: 12px;
   text-align: center;
   color: #333;
+}
+
+/* 持仓个股弹窗样式 */
+.stock-modal {
+  max-width: 95%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-body {
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading-stocks {
+  padding: 40px 20px;
+  text-align: center;
+  color: #666;
+}
+
+.retry-btn {
+  margin-top: 10px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.stock-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.stock-item {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.stock-item:last-child {
+  border-bottom: none;
+}
+
+.stock-item:hover {
+  background: #f8f9fa;
+}
+
+.stock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.stock-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stock-code {
+  font-size: 12px;
+  color: #666;
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.stock-data {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.stock-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+}
+
+.stock-change {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.stock-change.positive {
+  color: #f5222d;
+  background: rgba(245, 34, 45, 0.1);
+}
+
+.stock-change.negative {
+  color: #52c41a;
+  background: rgba(82, 196, 26, 0.1);
+}
+
+.stock-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.empty-stocks {
+  padding: 60px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.empty-stocks .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-stocks .empty-text {
+  font-size: 16px;
+}
+
+/* 个股详情弹窗样式 */
+.stock-detail-modal {
+  max-width: 95%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-detail-body {
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-detail-section {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.stock-detail-section .detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.stock-detail-section .detail-item:last-child {
+  border-bottom: none;
+}
+
+.stock-detail-section .detail-label {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.stock-detail-section .detail-value {
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stock-detail-section .detail-value.value-large {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stock-detail-section .detail-value.positive {
+  color: #f5222d;
+}
+
+.stock-detail-section .detail-value.negative {
+  color: #52c41a;
 }
 
 .spinner {
