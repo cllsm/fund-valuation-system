@@ -505,8 +505,18 @@ export default {
       connectionStatus.value = 'ok'
 
       try {
-        // 标记所有基金为更新中状态
-        funds.value.forEach(fund => {
+        // 根据当前分组筛选需要刷新的基金
+        const fundsToRefresh = currentGroup.value 
+          ? funds.value.filter(fund => fund.groupId === currentGroup.value)
+          : funds.value
+        
+        if (fundsToRefresh.length === 0) {
+          isRefreshing.value = false
+          return
+        }
+
+        // 标记需要刷新的基金为更新中状态
+        fundsToRefresh.forEach(fund => {
           fund.isUpdating = true
         })
 
@@ -514,8 +524,8 @@ export default {
         const batchSize = 5
         const promises = []
         
-        for (let i = 0; i < funds.value.length; i += batchSize) {
-          const batch = funds.value.slice(i, i + batchSize)
+        for (let i = 0; i < fundsToRefresh.length; i += batchSize) {
+          const batch = fundsToRefresh.slice(i, i + batchSize)
           const batchPromise = Promise.allSettled(
             batch.map(async (fund, index) => {
               try {
@@ -540,7 +550,7 @@ export default {
           promises.push(batchPromise)
           
           // 批次间延迟，避免同时大量请求
-          if (i + batchSize < funds.value.length) {
+          if (i + batchSize < fundsToRefresh.length) {
             await new Promise(resolve => setTimeout(resolve, 300))
           }
         }
