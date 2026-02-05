@@ -11,8 +11,20 @@
 export async function getFundAssetAllocation(fundCode) {
   try {
     const timestamp = Date.now();
-    // 使用本地代理解决CORS问题
-    const url = `/api/danjuan/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
+    
+    // 判断环境：开发环境使用代理，生产环境使用其他策略
+    const isDevelopment = import.meta.env.MODE === 'development';
+    
+    let url;
+    if (isDevelopment) {
+      // 开发环境：使用本地代理
+      url = `/api/danjuan/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
+    } else {
+      // 生产环境：尝试免费CORS代理或直接返回模拟数据
+      // 使用免费的CORS代理服务
+      const originalUrl = `https://danjuanfunds.com/djapi/fundx/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
+      url = `https://api.allorigins.win/get?url=${encodeURIComponent(originalUrl)}`;
+    }
     
     const response = await fetch(url);
     
@@ -20,7 +32,14 @@ export async function getFundAssetAllocation(fundCode) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    const data = await response.json();
+    let data;
+    if (isDevelopment) {
+      data = await response.json();
+    } else {
+      // 生产环境：allorigins.win返回的数据格式不同
+      const result = await response.json();
+      data = JSON.parse(result.contents);
+    }
     
     if (data.result_code === 0) {
       return data.data;
@@ -135,8 +154,19 @@ function generateMockAssetData(fundCode) {
 export async function getFundRealTimeData(fundCode) {
   try {
     const timestamp = Date.now();
-    // 使用本地代理解决CORS问题
-    const url = `/api/danjuan/base/fund/detail/${fundCode}?t=${timestamp}`;
+    
+    // 判断环境：开发环境使用代理，生产环境使用其他策略
+    const isDevelopment = import.meta.env.MODE === 'development';
+    
+    let url;
+    if (isDevelopment) {
+      // 开发环境：使用本地代理
+      url = `/api/danjuan/base/fund/detail/${fundCode}?t=${timestamp}`;
+    } else {
+      // 生产环境：尝试免费CORS代理
+      const originalUrl = `https://danjuanfunds.com/djapi/fundx/base/fund/detail/${fundCode}?t=${timestamp}`;
+      url = `https://api.allorigins.win/get?url=${encodeURIComponent(originalUrl)}`;
+    }
     
     const response = await fetch(url);
     
@@ -144,7 +174,14 @@ export async function getFundRealTimeData(fundCode) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    const data = await response.json();
+    let data;
+    if (isDevelopment) {
+      data = await response.json();
+    } else {
+      // 生产环境：allorigins.win返回的数据格式不同
+      const result = await response.json();
+      data = JSON.parse(result.contents);
+    }
     
     if (data.result_code === 0) {
       return {
