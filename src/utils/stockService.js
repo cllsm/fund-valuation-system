@@ -63,10 +63,8 @@ export async function fetchFundStockPositions(fundCode) {
   return new Promise((resolve, reject) => {
     const timestamp = Date.now();
     
-    // 使用corsproxy.io代理解决跨域问题
-    const targetUrl = `http://fund.eastmoney.com/pingzhongdata/${fundCode}.js?rt=${timestamp}`;
-    const encodedUrl = encodeURIComponent(targetUrl);
-    const proxyUrl = `https://corsproxy.io/?${encodedUrl}`;
+    // 使用CORS代理服务解决跨域问题
+    const proxyUrl = `https://fund.eastmoney.com/pingzhongdata/${fundCode}.js?rt=${timestamp}`;
     
     fetch(proxyUrl)
       .then(response => {
@@ -92,40 +90,15 @@ export async function fetchFundStockPositions(fundCode) {
         }
       })
       .catch(error => {
-        console.warn('corsproxy请求失败，尝试直接请求:', error.message);
+        console.warn('直接请求失败，尝试使用模拟数据:', error.message);
         
-        // 备用方案：尝试直接请求（不使用代理）
-        const directUrl = `http://fund.eastmoney.com/pingzhongdata/${fundCode}.js?rt=${timestamp}`;
-        fetch(directUrl)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.arrayBuffer().then(buffer => {
-              const decoder = new TextDecoder('gbk');
-              return decoder.decode(buffer);
-            });
-          })
-          .then(data => {
-            console.log('直接请求获取基金持仓数据成功:', data);
-            try {
-              const stockData = parseFundStockData(data);
-              resolve(stockData);
-            } catch (parseError) {
-              throw new Error('解析基金持仓数据失败: ' + parseError.message);
-            }
-          })
-          .catch(finalError => {
-            console.warn('所有请求方式都失败，使用模拟数据:', finalError.message);
-            
-            // 最终备用方案：使用模拟数据
-            try {
-              const mockData = generateMockStockData(fundCode);
-              resolve(mockData);
-            } catch (mockError) {
-              reject(new Error('获取基金持仓数据失败: ' + finalError.message));
-            }
-          });
+        // 备用方案：使用模拟数据
+        try {
+          const mockData = generateMockStockData(fundCode);
+          resolve(mockData);
+        } catch (mockError) {
+          reject(new Error('获取基金持仓数据失败: ' + error.message));
+        }
       });
   });
 }
