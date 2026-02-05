@@ -27,6 +27,18 @@
         刷新最新数据
       </button>
       
+      <!-- 排序按钮 -->
+      <div class="sort-controls">
+        <button 
+          class="btn btn-outline" 
+          @click="toggleSort('changeRate')"
+          :class="{ 'btn-active': sortField === 'changeRate' }"
+        >
+          <span class="btn-icon">{{ sortField === 'changeRate' ? (sortOrder === 'desc' ? '↓' : '↑') : '↕' }}</span>
+          涨跌幅排序
+        </button>
+      </div>
+      
       <!-- 分组选择器 -->
       <div class="group-selector" v-if="groups.length > 0">
         <select v-model="currentGroup" @change="switchGroup" class="group-select">
@@ -76,7 +88,12 @@
             <th class="code-col">基金代码</th>
             <th class="name-col">基金名称</th>
             <th class="value-col">估算净值</th>
-            <th class="change-col">估算涨跌幅</th>
+            <th class="change-col" @click="toggleSort('changeRate')" :class="{ 'sortable': true, 'sorted': sortField === 'changeRate', 'sort-desc': sortField === 'changeRate' && sortOrder === 'desc' }">
+              估算涨跌幅
+              <span v-if="sortField === 'changeRate'" class="sort-indicator">
+                {{ sortOrder === 'desc' ? '↓' : '↑' }}
+              </span>
+            </th>
             <th class="time-col">更新时间</th>
             <th class="group-col" v-if="groups.length > 0">分组</th>
           </tr>
@@ -225,16 +242,50 @@ export default {
     const connectionStatus = ref('ok')
     const currentGroup = ref('')
     const editingGroupId = ref('')
+    const sortField = ref('')
+    const sortOrder = ref('desc') // desc: 降序, asc: 升序
 
     // 计算属性
     const displayedFunds = computed(() => {
       if (!funds.value || !Array.isArray(funds.value)) {
         return []
       }
-      if (!currentGroup.value) {
-        return funds.value
+      
+      let filteredFunds = funds.value
+      
+      // 分组筛选
+      if (currentGroup.value) {
+        filteredFunds = filteredFunds.filter(fund => fund.groupId === currentGroup.value)
       }
-      return funds.value.filter(fund => fund.groupId === currentGroup.value)
+      
+      // 排序
+      if (sortField.value) {
+        filteredFunds = [...filteredFunds].sort((a, b) => {
+          const aValue = a[sortField.value] || 0
+          const bValue = b[sortField.value] || 0
+          
+          if (sortField.value === 'changeRate') {
+            // 处理涨跌幅排序，null/undefined值排在最后
+            if (aValue === undefined || aValue === null) return 1
+            if (bValue === undefined || bValue === null) return -1
+            
+            if (sortOrder.value === 'desc') {
+              return bValue - aValue // 降序：涨幅大的在前
+            } else {
+              return aValue - bValue // 升序：跌幅大的在前
+            }
+          }
+          
+          // 默认排序
+          if (sortOrder.value === 'desc') {
+            return bValue > aValue ? 1 : -1
+          } else {
+            return aValue > bValue ? 1 : -1
+          }
+        })
+      }
+      
+      return filteredFunds
     })
 
     const isAllSelected = computed(() => {
@@ -289,6 +340,9 @@ export default {
       funds.value = funds.value.filter(fund => !selectedFunds.value.includes(fund.code))
       selectedFunds.value = []
       saveToStorage()
+      
+      // 更新分组统计
+      updateGroupStats()
     }
 
     // 分组相关方法
@@ -369,11 +423,23 @@ export default {
       selectedFunds.value = []
     }
 
-    const updateFundGroup = () => {
+    const updateFundGroup = (fund) => {
       saveToStorage()
       
       // 更新分组统计
       updateGroupStats()
+    }
+
+    // 排序方法
+    const toggleSort = (field) => {
+      if (sortField.value === field) {
+        // 切换排序顺序
+        sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+      } else {
+        // 设置新的排序字段，默认降序
+        sortField.value = field
+        sortOrder.value = 'desc'
+      }
     }
 
     const updateGroupStats = () => {
@@ -601,15 +667,6 @@ export default {
       }
     })
 
-    // 监听自动刷新开关
-    watch(autoRefresh, (newVal) => {
-      if (newVal && funds.value.length > 0) {
-        startAutoRefresh()
-      } else {
-        clearInterval(refreshTimer)
-      }
-    })
-
     // 生命周期
     onMounted(() => {
       loadFromStorage()
@@ -645,6 +702,8 @@ export default {
       isAllSelected,
       isIndeterminate,
       statusText,
+      sortField,
+      sortOrder,
       formatChangeRate,
       getChangeClass,
       toggleSelectAll,
@@ -657,7 +716,8 @@ export default {
       renameGroup,
       deleteCurrentGroup,
       switchGroup,
-      updateFundGroup
+      updateFundGroup,
+      toggleSort
     }
   }
 }
@@ -816,6 +876,17 @@ export default {
   border-color: #40a9ff;
 }
 
+/* 排序控制 */
+.sort-controls {
+  margin-left: 10px;
+}
+
+.btn-active {
+  background: #40a9ff !important;
+  color: white !important;
+  border-color: #40a9ff !important;
+}
+
 /* 分组操作栏 */
 .group-toolbar {
   padding: 15px 30px;
@@ -917,6 +988,25 @@ input:checked + .slider:before {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.fund-table th.sortable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.fund-table th.sortable:hover {
+  background: #f0f0f0;
+}
+
+.fund-table th.sorted {
+  background: #e6f7ff;
+}
+
+.sort-indicator {
+  margin-left: 4px;
+  font-weight: bold;
+  font-size: 12px;
 }
 
 .fund-table tbody tr:hover {
