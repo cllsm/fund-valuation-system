@@ -1,0 +1,14 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+
+[[services]]
+name = "web"
+
+[services.run]
+command = "node server/index.js"
+
+[services.env]
+NODE_ENV = "production"

@@ -12,18 +12,19 @@ export async function getFundAssetAllocation(fundCode) {
   try {
     const timestamp = Date.now();
     
-    // 判断环境：开发环境使用代理，生产环境使用其他策略
+    // 判断环境：开发环境使用代理，生产环境使用自有后端
     const isDevelopment = import.meta.env.MODE === 'development';
     
     let url;
     if (isDevelopment) {
-      // 开发环境：使用本地代理
+      // 开发环境：使用Vite本地代理
       url = `/api/danjuan/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
     } else {
-      // 生产环境：尝试免费CORS代理或直接返回模拟数据
-      // 使用免费的CORS代理服务
-      const originalUrl = `https://danjuanfunds.com/djapi/fundx/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
-      url = `https://api.allorigins.win/get?url=${encodeURIComponent(originalUrl)}`;
+      // 生产环境：使用自有后端API
+      const backendBaseUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001' 
+        : window.location.origin;
+      url = `${backendBaseUrl}/api/danjuan/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
     }
     
     const response = await fetch(url);
@@ -32,13 +33,19 @@ export async function getFundAssetAllocation(fundCode) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
+    const result = await response.json();
+    
+    // 处理不同环境的响应格式
     let data;
     if (isDevelopment) {
-      data = await response.json();
+      data = result;
     } else {
-      // 生产环境：allorigins.win返回的数据格式不同
-      const result = await response.json();
-      data = JSON.parse(result.contents);
+      // 生产环境：自有后端返回{success, data}格式
+      if (result.success) {
+        data = result.data;
+      } else {
+        throw new Error(result.error);
+      }
     }
     
     if (data.result_code === 0) {
