@@ -451,8 +451,8 @@ export default {
     }
 
     const showFundDetail = (fund) => {
-      // 创建基金数据的深拷贝，避免自动刷新影响详情弹窗
-      selectedFund.value = {
+      // 创建基金数据的真正深拷贝，避免自动刷新影响详情弹窗
+      selectedFund.value = JSON.parse(JSON.stringify({
         code: fund.code,
         name: fund.name,
         currentValue: fund.currentValue,
@@ -460,29 +460,29 @@ export default {
         updateTime: fund.updateTime,
         groupId: fund.groupId,
         assetData: fund.assetData
-      }
+      }))
       showFundDetailDialog.value = true
     }
 
     const refreshSingleFund = async (fund) => {
       if (!fund) return
 
+      // 使用基金代码作为唯一标识，避免引用问题
+      const fundCode = fund.code
+
       // 在原始数据中找到对应的基金对象并标记更新状态
-      const originalFund = funds.value.find(f => f.code === fund.code)
+      const originalFund = funds.value.find(f => f.code === fundCode)
       if (originalFund) {
         originalFund.isUpdating = true
       }
 
       try {
-        const fundData = await fetchFundData(fund.code)
+        const fundData = await fetchFundData(fundCode)
         if (fundData) {
-          // 更新详情弹窗中的副本数据
-          fund.name = fundData.name
-          fund.currentValue = fundData.gsz
-          fund.changeRate = parseFloat(fundData.gszzl)
-          fund.updateTime = fundData.gztime
+          // 使用接口返回的fundcode作为唯一标识（确保一致性）
+          const actualCode = fundData.fundcode
 
-          // 同步更新原始数据
+          // 同步更新原始数据（使用接口返回的code）
           if (originalFund) {
             originalFund.name = fundData.name
             originalFund.currentValue = fundData.gsz
@@ -490,13 +490,21 @@ export default {
             originalFund.updateTime = fundData.gztime
             originalFund.isUpdating = false
 
+            // 如果详情弹窗中显示的是该基金，也更新弹窗数据
+            if (selectedFund.value && selectedFund.value.code === fundCode) {
+              selectedFund.value.name = fundData.name
+              selectedFund.value.currentValue = fundData.gsz
+              selectedFund.value.changeRate = parseFloat(fundData.gszzl)
+              selectedFund.value.updateTime = fundData.gztime
+            }
+
             // 同时更新App.vue中的数据（如果存在）
             syncFundDataToApp(originalFund)
             saveToStorage()
           }
         }
       } catch (error) {
-        console.error(`刷新基金 ${fund.code} 数据失败:`, error)
+        console.error(`刷新基金 ${fundCode} 数据失败:`, error)
       } finally {
         if (originalFund) {
           originalFund.isUpdating = false
@@ -693,7 +701,8 @@ export default {
 
     // 资产配置相关方法
     const showFundStockPositions = async (fund) => {
-      selectedFund.value = fund
+      // 创建基金数据的深拷贝，避免修改原始数据
+      selectedFund.value = JSON.parse(JSON.stringify(fund))
       showStockPositionsDialog.value = true
       await loadFundAssetAllocation()
     }
