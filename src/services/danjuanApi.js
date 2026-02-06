@@ -15,18 +15,7 @@ export async function getFundAssetAllocation(fundCode) {
     // 判断环境：开发环境使用代理，生产环境使用自有后端
     const isDevelopment = import.meta.env.MODE === 'development';
     
-    let url;
-    if (isDevelopment) {
-      // 开发环境：使用Vite本地代理
-      url = `/api/danjuan/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
-    } else {
-      // 生产环境：使用自有后端API
-      const backendBaseUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3001' 
-        : window.location.origin;
-      url = `${backendBaseUrl}/api/danjuan/base/fund/record/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
-    }
-    
+    let url = `https://fund-valuation-proxy-production.up.railway.app/api/fund/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
     const response = await fetch(url);
     
     if (!response.ok) {
