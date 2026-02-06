@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import App from '../App.vue'
 import MobileApp from '../MobileApp.vue'
+import TestPage from '../views/TestPage.vue'
 
 // 基于屏幕尺寸检测是否为移动设备
 function isMobileScreen() {
@@ -28,6 +29,11 @@ const routes = [
     path: '/mobile',
     component: MobileApp,
     name: 'Mobile'
+  },
+  {
+    path: '/test',
+    component: TestPage,
+    name: 'Test'
   }
 ]
 
