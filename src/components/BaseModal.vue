@@ -121,6 +121,7 @@ export default {
   z-index: 1000;
   padding: 16px;
   backdrop-filter: blur(8px);
+    height: 100vh;
 }
 
 .modal {
