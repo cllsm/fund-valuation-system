@@ -12,10 +12,9 @@ export async function getFundAssetAllocation(fundCode) {
   try {
     const timestamp = Date.now();
     
-    // 判断环境：开发环境使用代理，生产环境使用自有后端
-    const isDevelopment = import.meta.env.MODE === 'development';
+    // 统一使用线上后端服务
+    const url = `https://fund-valuation-proxy-production.up.railway.app/api/fund/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
     
-    let url = `https://fund-valuation-proxy-production.up.railway.app/api/fund/asset/percent?fund_code=${fundCode}&t=${timestamp}`;
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -23,30 +22,20 @@ export async function getFundAssetAllocation(fundCode) {
     }
     
     const result = await response.json();
-    
-    // 处理不同环境的响应格式
-    let data;
-    if (isDevelopment) {
-      data = result;
+      console.log(result);
+      
+    // 处理线上后端服务的响应格式：{success, data}格式
+    if (result.result_code === 0) {
+      // 后端服务已经代理了蛋卷API，直接返回data
+      return result.data;
     } else {
-      // 生产环境：自有后端返回{success, data}格式
-      if (result.success) {
-        data = result.data;
-      } else {
-        throw new Error(result.error);
-      }
-    }
-    
-    if (data.result_code === 0) {
-      return data.data;
-    } else {
-      throw new Error('接口返回错误');
+      throw new Error(result.error || '接口返回错误');
     }
   } catch (error) {
     console.error('获取基金资产配置数据失败:', error);
     
     // 备用方案：返回模拟数据
-    return generateMockAssetData(fundCode);
+    // return generateMockAssetData(fundCode);
   }
 }
 

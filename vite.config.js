@@ -31,6 +31,12 @@ export default defineConfig({
         target: 'https://danjuanfunds.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/danjuan/, '/djapi/fundx')
+      },
+      // 代理本地后端服务
+      '/api/fund': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/fund/, '/api/fund')
       }
     }
   },
