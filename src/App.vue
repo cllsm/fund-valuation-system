@@ -671,32 +671,56 @@ export default {
 
     // 持仓相关方法
     const showFundDetail = (fund) => {
-      selectedFund.value = fund
+      // 创建基金数据的深拷贝，避免自动刷新影响详情弹窗
+      selectedFund.value = {
+        code: fund.code,
+        name: fund.name,
+        currentValue: fund.currentValue,
+        changeRate: fund.changeRate,
+        updateTime: fund.updateTime,
+        groupId: fund.groupId,
+        assetData: fund.assetData
+      }
       showFundDetailDialog.value = true
     }
 
     const refreshSingleFund = async (fund) => {
       if (!fund) return
-      
-      fund.isUpdating = true
-      
+
+      // 在原始数据中找到对应的基金对象并标记更新状态
+      const originalFund = funds.value.find(f => f.code === fund.code)
+      if (originalFund) {
+        originalFund.isUpdating = true
+      }
+
       try {
         const fundData = await fetchFundData(fund.code)
         if (fundData) {
-          // 更新本地数据
+          // 更新详情弹窗中的副本数据
           fund.name = fundData.name
           fund.currentValue = fundData.gsz
           fund.changeRate = parseFloat(fundData.gszzl)
           fund.updateTime = fundData.gztime
-          
-          // 同时更新MobileApp.vue中的数据（如果存在）
-          syncFundDataToMobile(fund)
-          saveToStorage()
+
+          // 同步更新原始数据
+          if (originalFund) {
+            originalFund.name = fundData.name
+            originalFund.currentValue = fundData.gsz
+            originalFund.changeRate = parseFloat(fundData.gszzl)
+            originalFund.updateTime = fundData.gztime
+            originalFund.isUpdating = false
+
+            // 同时更新MobileApp.vue中的数据（如果存在）
+            syncFundDataToMobile(originalFund)
+            saveToStorage()
+          }
         }
       } catch (error) {
         console.error(`刷新基金 ${fund.code} 数据失败:`, error)
       } finally {
-        fund.isUpdating = false
+        if (originalFund) {
+          originalFund.isUpdating = false
+        }
       }
     }
 
@@ -1742,6 +1766,7 @@ input:checked + .slider:before {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .stock-body {
@@ -1749,6 +1774,7 @@ input:checked + .slider:before {
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: auto;
 }
 
 .loading-stocks {
@@ -1766,7 +1792,7 @@ input:checked + .slider:before {
 .stock-list {
   flex: 1;
   overflow-y: auto;
-  max-height: 400px;
+  /* max-height: 400px; */
 }
 
 .stock-item {
