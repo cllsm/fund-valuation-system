@@ -869,34 +869,36 @@ export default {
         const promises = []
         
         for (let i = 0; i < fundsToRefresh.length; i += batchSize) {
-          const batch = fundsToRefresh.slice(i, i + batchSize)
-          const batchPromise = Promise.allSettled(
-            batch.map(async (fund, index) => {
-              try {
-                const data = await fetchFundData(fund.code)
-                if (data) {
-                  // 使用基金代码精确匹配，避免索引顺序问题
-                  const targetFund = funds.value.find(f => f.code === fund.code)
-                  if (targetFund) {
-                    // 平滑更新数据，避免屏闪
-                    setTimeout(() => {
-                      targetFund.name = data.name
-                      targetFund.currentValue = data.gsz
-                      targetFund.changeRate = parseFloat(data.gszzl)
-                      targetFund.updateTime = data.gztime
-                      targetFund.isUpdating = false
-                    }, index * 100) // 分批延迟更新
-                  }
-                }
-              } catch (error) {
-                console.error(`刷新基金 ${fund.code} 数据失败:`, error)
-                const targetFund = funds.value.find(f => f.code === fund.code)
-                if (targetFund) {
-                  targetFund.isUpdating = false
-                }
-              }
-            })
-          )
+                const batch = fundsToRefresh.slice(i, i + batchSize)
+                const batchPromise = Promise.allSettled(
+                  batch.map(async (fund, index) => {
+                    try {
+                      const data = await fetchFundData(fund.code)
+                      if (data) {
+                        // 使用基金代码作为唯一标识符精确匹配，避免排序后的索引问题
+                        const targetFund = funds.value.find(f => f.code === fund.code)
+                        if (targetFund) {
+                          // 直接更新数据，不使用setTimeout避免排序后数据错位
+                          targetFund.name = data.name
+                          targetFund.currentValue = data.gsz
+                          targetFund.changeRate = parseFloat(data.gszzl)
+                          targetFund.updateTime = data.gztime
+                          targetFund.isUpdating = false
+
+                          // 同步数据到MobileApp
+                          syncFundDataToMobile(targetFund)
+                          saveToStorage()
+                        }
+                      }
+                    } catch (error) {
+                      console.error(`刷新基金 ${fund.code} 数据失败:`, error)
+                      const targetFund = funds.value.find(f => f.code === fund.code)
+                      if (targetFund) {
+                        targetFund.isUpdating = false
+                      }
+                    }
+                  })
+                )
           
           promises.push(batchPromise)
           
