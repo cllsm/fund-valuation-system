@@ -1,36 +1,35 @@
 import { ref } from 'vue'
 import { generateUUID } from '../utils/uuid'
 
-/**
- * 请求管理器 - 用于跟踪和控制并发请求
- */
 class RequestManager {
   constructor() {
     this.activeRequests = new Map()
     this.maxConcurrent = 5
   }
 
-  generateCallbackName() {
-    const requestId = generateUUID().replace(/-/g, '')
-    return `jsonp_callback_${requestId}`
-  }
-
-  registerRequest(requestId, callbackName, resolve, reject) {
+  registerRequest(requestId, fundCode, resolve, reject) {
     this.activeRequests.set(requestId, {
-      callbackName,
+      fundCode,
       resolve,
       reject,
       timestamp: Date.now()
     })
   }
 
+  handleCallback(fundCode, data) {
+    for (const [requestId, request] of this.activeRequests.entries()) {
+      if (request.fundCode === fundCode) {
+        request.resolve({ requestId, code: fundCode, data })
+        this.activeRequests.delete(requestId)
+        return true
+      }
+    }
+    return false
+  }
+
   cancelAllRequests() {
     this.activeRequests.forEach((request, requestId) => {
-      const { callbackName, reject } = request
-      if (window[callbackName]) {
-        delete window[callbackName]
-      }
-      reject(new Error('请求已取消'))
+      request.reject(new Error('请求已取消'))
     })
     this.activeRequests.clear()
   }
@@ -77,41 +76,32 @@ export function useFundData() {
   const createFetchPromise = (code, requestId, signal) => {
     return new Promise((resolve, reject) => {
       const timestamp = Date.now()
-      const callbackName = requestManager.generateCallbackName()
+      const url = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${timestamp}`
+      
+      console.log(`[fetchFundData] 创建请求: code=${code}, requestId=${requestId}`)
       
       if (signal?.aborted) {
         reject(new Error('请求已取消'))
         return
       }
-
-      const url = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${timestamp}&callback=${callbackName}`
+      
+      requestManager.registerRequest(requestId, code, resolve, reject)
       
       let isResolved = false
       let script = null
       
-      const callback = (data) => {
-        if (isResolved) return
-        isResolved = true
-        cleanup()
-        
-        if (data && typeof data === 'object' && data.fundcode) {
-          resolve({ requestId, code, data })
-        } else {
-          reject(new Error('返回数据格式错误'))
-        }
-      }
-
       const cleanup = () => {
+        console.log(`[fetchFundData] 清理资源: code=${code}`)
         if (script && script.parentNode) {
           document.body.removeChild(script)
         }
-        if (window[callbackName]) {
-          delete window[callbackName]
+        if (!isResolved) {
+          requestManager.activeRequests.delete(requestId)
         }
-        requestManager.activeRequests.delete(requestId)
       }
 
       const abortHandler = () => {
+        console.log(`[fetchFundData] 请求已取消: code=${code}`)
         if (isResolved) return
         isResolved = true
         cleanup()
@@ -122,21 +112,26 @@ export function useFundData() {
         signal.addEventListener('abort', abortHandler, { once: true })
       }
 
-      window[callbackName] = callback
-
       script = document.createElement('script')
       script.src = url
       script.onerror = () => {
+        console.error(`[fetchFundData] script加载失败: code=${code}, url=${url}`)
         if (isResolved) return
         isResolved = true
         cleanup()
         reject(new Error('JSONP请求失败'))
       }
+      
+      script.onload = () => {
+        console.log(`[fetchFundData] script加载完成: code=${code}`)
+      }
 
       document.body.appendChild(script)
+      console.log(`[fetchFundData] script标签已添加: code=${code}`)
       
       setTimeout(() => {
         if (!isResolved) {
+          console.warn(`[fetchFundData] 请求超时: code=${code}, 10秒内未收到回调`)
           isResolved = true
           cleanup()
           reject(new Error(`请求超时: ${code}`))
@@ -155,6 +150,14 @@ export function useFundData() {
 
     fund.isUpdating = true
     const requestId = generateUUID()
+    
+    const originalJsonpgz = window.jsonpgz
+    
+    window.jsonpgz = (data) => {
+      if (data && data.fundcode === fund.code) {
+        originalJsonpgz?.(data)
+      }
+    }
 
     try {
       const result = await fetchFundData(fund.code, requestId, abortController.value?.signal)
@@ -171,16 +174,31 @@ export function useFundData() {
     } catch (error) {
       console.error(`刷新基金 ${fund.code} 数据失败:`, error)
       fund.isUpdating = false
+    } finally {
+      window.jsonpgz = originalJsonpgz
     }
   }
 
   const refreshAllData = async (batchSize = 5) => {
     if (funds.value.length === 0) return
     
+    console.log('[refreshAllData] 开始刷新，基金数量:', funds.value.length)
     isRefreshing.value = true
     
     abortController.value = new AbortController()
     requestManager.maxConcurrent = batchSize
+    requestManager.cancelAllRequests()
+    
+    const originalJsonpgz = window.jsonpgz
+    
+    window.jsonpgz = (data) => {
+      if (data && data.fundcode) {
+        const handled = requestManager.handleCallback(data.fundcode, data)
+        if (!handled) {
+          console.warn(`收到未预期的基金数据: ${data.fundcode}`)
+        }
+      }
+    }
     
     const fundRequestMap = new Map()
     funds.value.forEach(fund => {
@@ -199,7 +217,9 @@ export function useFundData() {
     }))
 
     try {
+      console.log('[refreshAllData] 开始处理批次请求')
       const results = await processBatchRequests(requests, batchSize, abortController.value.signal)
+      console.log('[refreshAllData] 批次请求完成，结果数:', results.length)
       
       results.forEach(result => {
         if (result.status === 'fulfilled' && result.value) {
@@ -240,8 +260,11 @@ export function useFundData() {
         fund.isUpdating = false
       })
     } finally {
+      console.log('[refreshAllData] 刷新完成，isRefreshing 设置为 false')
       isRefreshing.value = false
       abortController.value = null
+      window.jsonpgz = originalJsonpgz
+      requestManager.cancelAllRequests()
     }
   }
 
@@ -251,28 +274,38 @@ export function useFundData() {
     
     for (let i = 0; i < requests.length; i += batchSize) {
       if (signal?.aborted) {
+        console.log('[processBatchRequests] 信号已中止，取消所有请求')
+        requestManager.cancelAllRequests()
         throw new Error('操作已取消')
       }
       
       const batch = requests.slice(i, i + batchSize)
       
+      console.log(`[processBatchRequests] 处理批次 ${Math.floor(i/batchSize) + 1}, 请求数: ${batch.length}`)
+      
       const batchPromises = batch.map(({ requestId, fundCode }) => 
         fetchFundData(fundCode, requestId, signal)
-          .catch(error => ({
-            requestId,
-            fundCode,
-            error: error.message
-          }))
+          .catch(error => {
+            console.error(`[processBatchRequests] 请求失败: ${fundCode}`, error)
+            return {
+              requestId,
+              fundCode,
+              error: error.message
+            }
+          })
       )
       
       const batchResults = await Promise.allSettled(batchPromises)
+      console.log(`[processBatchRequests] 批次完成，成功: ${batchResults.filter(r => r.status === 'fulfilled').length}`)
       results.push(...batchResults)
       
       if (i + batchSize < requests.length) {
+        console.log(`[processBatchRequests] 等待 200ms 后处理下一批次`)
         await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
     
+    console.log(`[processBatchRequests] 所有批次处理完成，总结果数: ${results.length}`)
     return results
   }
 
@@ -286,25 +319,37 @@ export function useFundData() {
     }
 
     const requestId = generateUUID()
-    const result = await fetchFundData(code, requestId)
+    const originalJsonpgz = window.jsonpgz
     
-    if (!result || !result.data) {
-      throw new Error('获取基金数据失败，请检查基金代码是否正确')
+    window.jsonpgz = (data) => {
+      if (data && data.fundcode === code) {
+        originalJsonpgz?.(data)
+      }
     }
 
-    const newFund = {
-      id: generateUUID(),
-      code: code,
-      name: result.data.name,
-      currentValue: result.data.gsz,
-      changeRate: parseFloat(result.data.gszzl),
-      updateTime: result.data.gztime,
-      groupId: groupId,
-      isUpdating: false
+    try {
+      const result = await fetchFundData(code, requestId)
+      
+      if (!result || !result.data) {
+        throw new Error('获取基金数据失败，请检查基金代码是否正确')
+      }
+
+      const newFund = {
+        id: generateUUID(),
+        code: code,
+        name: result.data.name,
+        currentValue: result.data.gsz,
+        changeRate: parseFloat(result.data.gszzl),
+        updateTime: result.data.gztime,
+        groupId: groupId,
+        isUpdating: false
+      }
+      
+      funds.value.push(newFund)
+      return newFund
+    } finally {
+      window.jsonpgz = originalJsonpgz
     }
-    
-    funds.value.push(newFund)
-    return newFund
   }
 
   // 删除基金

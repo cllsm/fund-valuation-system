@@ -71,7 +71,7 @@
         删除分组
       </button>
     </div>
-
+{{isRefreshing}}
     <!-- 基金数据表格 -->
     <div class="table-container" :class="{ 'loading': isRefreshing }">
       <FundTable
