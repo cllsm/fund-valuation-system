@@ -209,12 +209,19 @@ export function useFundData() {
         fundCode: fund.code,
         originalIndex: funds.value.indexOf(fund)
       })
+      console.log(`[refreshAllData] 注册基金: ${fund.code}, requestId: ${requestId}`)
     })
+
+    console.log('[refreshAllData] fundRequestMap 大小:', fundRequestMap.size)
+    console.log('[refreshAllData] fundRequestMap 内容:', Array.from(fundRequestMap.entries()))
 
     const requests = Array.from(fundRequestMap.entries()).map(([requestId, info]) => ({
       requestId,
       fundCode: info.fundCode
     }))
+
+    console.log('[refreshAllData] requests 数组长度:', requests.length)
+    console.log('[refreshAllData] requests 内容:', requests)
 
     try {
       console.log('[refreshAllData] 开始处理批次请求')
@@ -270,7 +277,13 @@ export function useFundData() {
 
   // 添加基金
   const processBatchRequests = async (requests, batchSize, signal) => {
+    console.log('[processBatchRequests] 开始处理, requests.length:', requests.length, 'batchSize:', batchSize)
     const results = []
+    
+    if (requests.length === 0) {
+      console.warn('[processBatchRequests] requests 数组为空，跳过处理')
+      return results
+    }
     
     for (let i = 0; i < requests.length; i += batchSize) {
       if (signal?.aborted) {
@@ -282,6 +295,7 @@ export function useFundData() {
       const batch = requests.slice(i, i + batchSize)
       
       console.log(`[processBatchRequests] 处理批次 ${Math.floor(i/batchSize) + 1}, 请求数: ${batch.length}`)
+      console.log(`[processBatchRequests] 当前批次请求:`, batch.map(r => r.fundCode))
       
       const batchPromises = batch.map(({ requestId, fundCode }) => 
         fetchFundData(fundCode, requestId, signal)
