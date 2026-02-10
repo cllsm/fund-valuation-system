@@ -22,7 +22,7 @@
         <span class="btn-icon">×</span>
         删除选中
       </button>
-      <button class="btn btn-success" @click="refreshAllData">
+      <button class="btn btn-success" @click="() => refreshAllData()">
         <span class="btn-icon">↻</span>
         刷新最新数据
       </button>

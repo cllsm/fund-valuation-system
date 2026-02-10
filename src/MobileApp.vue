@@ -16,7 +16,7 @@
           基金估值
         </h1>
         <div class="header-actions">
-          <button class="refresh-btn" @click="refreshAllData" :disabled="isRefreshing">
+          <button class="refresh-btn" @click="() => refreshAllData()" :disabled="isRefreshing">
             <span class="icon">{{ isRefreshing ? '⏳' : '🔄' }}</span>
           </button>
           <button class="add-btn" @click="showAddFundDialog = true">
