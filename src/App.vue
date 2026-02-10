@@ -84,8 +84,8 @@
         @toggle-selection="toggleFundSelection"
         @change-group="changeFundGroup"
         @view-detail="showFundDetail"
-        @refresh="refreshSingleFund"
-        @delete="deleteFund"
+        @refresh="(fund) => refreshSingleFund(fund.id)"
+        @delete="(fund) => handleSingleDelete(fund)"
       />
     </div>
 
@@ -197,7 +197,7 @@
       @close="closeFundDetail"
       @refresh="refreshSingleFund(selectedFund.id)"
       @view-assets="viewStockPositions"
-      @delete="deleteFund(selectedFund.id)"
+      @delete="handleSingleDelete(selectedFund)"
     />
 
     <!-- 资产配置对话框 -->
@@ -470,6 +470,20 @@ const changeFundGroup = ({ fund, groupId }) => {
     fundFromList.groupId = groupId
     updateGroupStats()
     saveToStorage()
+  }
+}
+
+const handleSingleDelete = (fund) => {
+  if (confirm(`确定要删除基金 "${fund.name}" (${fund.code}) 吗？`)) {
+    deleteFund(fund.id)
+    updateGroupStats()
+    saveToStorage()
+    
+    // 如果删除的是当前选中的基金，关闭详情弹窗
+    if (selectedFund.value && selectedFund.value.id === fund.id) {
+      showFundDetailDialog.value = false
+      selectedFund.value = null
+    }
   }
 }
 
