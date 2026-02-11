@@ -194,7 +194,7 @@ export function useFundData() {
         Object.assign(fund, {
           name: result.data.name,
           currentValue: result.data.gsz,
-          changeRate: parseFloat(result.data.gszzl),
+          changeRate: (result.data.gszzl),
           updateTime: result.data.gztime,
           isUpdating: false
         })
@@ -268,7 +268,7 @@ export function useFundData() {
           Object.assign(fund, {
             name: data.name,
             currentValue: data.gsz,
-            changeRate: parseFloat(data.gszzl),
+            changeRate: (data.gszzl),
             updateTime: data.gztime,
             isUpdating: false,
             updateError: null
@@ -362,7 +362,7 @@ export function useFundData() {
         code: code,
         name: result.data.name,
         currentValue: result.data.gsz,
-        changeRate: parseFloat(result.data.gszzl),
+        changeRate: (result.data.gszzl),
         updateTime: result.data.gztime,
         groupId: groupId,
         isUpdating: false
