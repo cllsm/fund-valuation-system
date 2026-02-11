@@ -71,7 +71,6 @@
         删除分组
       </button>
     </div>
-{{isRefreshing}}
     <!-- 基金数据表格 -->
     <div class="table-container" :class="{ 'loading': isRefreshing }">
       <FundTable
@@ -636,7 +635,6 @@ onUnmounted(() => {
 
 <style scoped>
 .app {
-  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -645,6 +643,7 @@ onUnmounted(() => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  height: 100vh;
 }
 
 .header {
