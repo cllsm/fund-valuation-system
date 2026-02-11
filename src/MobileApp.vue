@@ -62,7 +62,7 @@
           @click="showFundDetail(fund)"
           @delete="deleteFund(fund.id)"
           @refresh="refreshSingleFund(fund.id)"
-          @change-group="handleChangeGroup(fund.id, $event)"
+          @change-group="handleChangeGroup(fund, $event)"
         />
 
         <!-- 空状态 -->
@@ -513,6 +513,16 @@ const startAutoRefresh = () => {
 const startTimeUpdate = () => {
   updateTime()
   timeTimer = setInterval(updateTime, 1000)
+}
+
+// 处理分组变更
+const handleChangeGroup = (fund, groupId) => {
+  const fundFromList = funds.value.find(f => f.id === fund.id)
+  if (fundFromList) {
+    fundFromList.groupId = groupId
+    updateGroupStats(funds.value)
+    saveFundsAndGroups(funds.value, groups.value, currentGroup.value)
+  }
 }
 
 // 切换自动刷新
