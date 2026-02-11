@@ -88,7 +88,7 @@
       </button>
       <button class="nav-btn" @click="toggleAutoRefresh">
         <span class="nav-icon">{{ autoRefresh ? '⏰' : '⏸️' }}</span>
-        <span class="nav-text">{{ autoRefresh ? '自动' : '暂停' }}</span>
+        <span class="nav-text">{{ autoRefresh ? `自动(${refreshCountdown}s)` : '暂停' }}</span>
       </button>
     </nav>
 
@@ -183,6 +183,10 @@
       </div>
 
       <template #footer>
+        <!-- 新建 -->
+         <button class="btn btn-primary" @click="showManageGroupDialog = false; showAddGroupDialog = true">
+           新建分组
+         </button>
         <button class="btn btn-secondary" @click="showManageGroupDialog = false">关闭</button>
       </template>
     </BaseModal>
@@ -303,6 +307,7 @@ const stockError = ref('')
 const loading = ref(false)
 const isLoadingStocks = ref(false)
 const autoRefresh = ref(true)
+const refreshCountdown = ref(0)
 const connectionStatus = ref('ok')
 const currentTime = ref('')
 const currentSort = ref('default')
@@ -476,12 +481,28 @@ const updateTime = () => {
 
 // 自动刷新定时器
 let refreshTimer = null
+let countdownTimer = null
 let timeTimer = null
 
 const startAutoRefresh = () => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
   }
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
+  
+  // 启动倒计时
+  refreshCountdown.value = 60
+  countdownTimer = setInterval(() => {
+    if (refreshCountdown.value > 0) {
+      refreshCountdown.value--
+    } else {
+      refreshCountdown.value = 60
+    }
+  }, 1000)
+  
+  // 启动刷新定时器
   refreshTimer = setInterval(() => {
     if (autoRefresh.value && funds.value.length > 0) {
       refreshAllData(3)
@@ -494,12 +515,28 @@ const startTimeUpdate = () => {
   timeTimer = setInterval(updateTime, 1000)
 }
 
+// 切换自动刷新
+const toggleAutoRefresh = () => {
+  autoRefresh.value = !autoRefresh.value
+  
+  if (autoRefresh.value && funds.value.length > 0) {
+    startAutoRefresh()
+  } else {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+    clearInterval(countdownTimer)
+    countdownTimer = null
+    refreshCountdown.value = 0
+  }
+}
+
 // 监听自动刷新开关
 watch(autoRefresh, (newVal) => {
   if (newVal && funds.value.length > 0) {
     startAutoRefresh()
   } else {
     clearInterval(refreshTimer)
+    refreshTimer = null
   }
 })
 

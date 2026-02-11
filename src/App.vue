@@ -55,7 +55,7 @@
           <input type="checkbox" v-model="autoRefresh">
           <span class="slider"></span>
         </label>
-        <span class="auto-refresh-label">自动刷新 (60秒)</span>
+        <span class="auto-refresh-label">自动刷新 ({{ autoRefresh ? refreshCountdown + '秒' : '60秒' }})</span>
       </div>
     </div>
 
@@ -285,6 +285,7 @@ const sortOrder = ref('desc')
 
 // 自动刷新状态
 const autoRefresh = ref(false)
+const refreshCountdown = ref(0)
 
 // 资产配置数据
 const stockPositions = ref(null)
@@ -553,11 +554,27 @@ const saveToStorage = () => {
 
 // 自动刷新定时器
 let refreshTimer = null
+let countdownTimer = null
 
 const startAutoRefresh = () => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
   }
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
+  
+  // 启动倒计时
+  refreshCountdown.value = 60
+  countdownTimer = setInterval(() => {
+    if (refreshCountdown.value > 0) {
+      refreshCountdown.value--
+    } else {
+      refreshCountdown.value = 60
+    }
+  }, 1000)
+  
+  // 启动刷新定时器
   refreshTimer = setInterval(() => {
     if (autoRefresh.value && funds.value.length > 0) {
       refreshAllData()
@@ -573,6 +590,11 @@ watch(autoRefresh, (newVal) => {
     if (refreshTimer) {
       clearInterval(refreshTimer)
       refreshTimer = null
+    }
+    if (countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+      refreshCountdown.value = 0
     }
   }
 })
@@ -605,6 +627,9 @@ onMounted(() => {
 onUnmounted(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
+  }
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
   }
 })
 </script>
